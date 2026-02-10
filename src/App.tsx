@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
   FileText,
@@ -11,36 +11,44 @@ import {
   Zap,
   Maximize2,
   Minimize2,
-  Github
+  Github,
+  CheckCircle2,
+  Loader2
 } from 'lucide-react';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 import './App.css';
 
-const DEFAULT_LATEX = `\\section{Welcome to LuminaLaTeX}
+const DEFAULT_LATEX = `\\section{LuminaLaTeX Deep Dive}
 
 LuminaLaTeX is a high-performance, real-time LaTeX editor.
 
-\\subsection{Mathematics}
-You can write complex equations like the Schrodinger Equation:
+\\subsection{Equation of the Universe}
+The Schrodinger Equation describes how the quantum state of a physical system changes with time.
 \\[ i\\hbar\\frac{\\partial}{\\partial t}\\Psi(\\mathbf{r},t) = \\left[ -\\frac{\\hbar^2}{2m}\\nabla^2 + V(\\mathbf{r},t) \\right]\\Psi(\\mathbf{r},t) \\]
 
-Or Euler's identity:
-\\[ e^{i\\pi} + 1 = 0 \\]
+\\subsection{Matrices}
+Complex data can be represented easily:
+\\[ A = \\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix} \\]
 
-\\subsection{Formatting}
-\\textbf{Bold text}, \\textit{Italic text}, and \\underline{underlined text}.
-
+\\subsection{Key Advancements}
 \\begin{itemize}
-  \\item Instant Live Preview
-  \\item Glassmorphism UI
-  \\item High Performance KaTeX Rendering
-\\end{itemize}`;
+  \\item \\textbf{Live PDF Export}: Export your rendered document instantly.
+  \\item \\textbf{KaTeX Engine}: Desktop-grade math performance.
+  \\item \\textbf{Smart Snippets}: One-tap symbol insertion.
+\\end{itemize}
+
+\\textit{Happy typesetting!}
+`;
 
 const App: React.FC = () => {
   const [latex, setLatex] = useState(DEFAULT_LATEX);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const previewRef = useRef<HTMLDivElement>(null);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(latex);
@@ -52,6 +60,39 @@ const App: React.FC = () => {
     if (confirm('Are you sure you want to clear the editor?')) {
       setLatex('');
     }
+  };
+
+  const handleExportPDF = async () => {
+    if (!previewRef.current || isExporting) return;
+
+    setIsExporting(true);
+    try {
+      const element = previewRef.current.querySelector('.preview-content') as HTMLElement;
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgProps = pdf.getImageProperties(imgData);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save('lumina-document.pdf');
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert('Failed to export PDF. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const insertSnippet = (snippet: string) => {
+    setLatex(prev => prev + snippet);
   };
 
   return (
@@ -71,10 +112,10 @@ const App: React.FC = () => {
 
         <div className="header-actions">
           <button className="btn-secondary" onClick={handleCopy}>
-            {isCopied ? 'Copied!' : <><Copy size={16} /> Copy .tex</>}
+            {isCopied ? <><CheckCircle2 size={16} /> Copied</> : <><Copy size={16} /> Copy .tex</>}
           </button>
-          <button className="btn-primary">
-            <Download size={16} /> Export PDF
+          <button className="btn-primary" onClick={handleExportPDF} disabled={isExporting}>
+            {isExporting ? <><Loader2 size={16} className="animate-spin" /> Working...</> : <><Download size={16} /> Export PDF</>}
           </button>
           <div className="divider"></div>
           <button className="btn-icon" onClick={() => setIsFullscreen(!isFullscreen)}>
@@ -92,19 +133,22 @@ const App: React.FC = () => {
         <aside className="snippets-sidebar glass">
           <div className="sidebar-title">Snippets</div>
           <div className="snippet-group">
-            <button onClick={() => setLatex(l => l + '\\frac{a}{b}')} title="Fraction">
+            <button onClick={() => insertSnippet('\\frac{a}{b}')} title="Fraction">
               <span className="latex-span">{'\\frac{a}{b}'}</span>
             </button>
-            <button onClick={() => setLatex(l => l + '\\sqrt{x}')} title="Square Root">
+            <button onClick={() => insertSnippet('\\sqrt{x}')} title="Square Root">
               <span className="latex-span">{'\\sqrt{x}'}</span>
             </button>
-            <button onClick={() => setLatex(l => l + '\\int_{a}^{b} f(x) dx')} title="Integral">
+            <button onClick={() => insertSnippet('\\int_{a}^{b}')} title="Integral">
               <span className="latex-span">{'\\int'}</span>
             </button>
-            <button onClick={() => setLatex(l => l + '\\sum_{i=1}^{n}')} title="Sum">
+            <button onClick={() => insertSnippet('\\sum_{i=0}^{n}')} title="Sum">
               <span className="latex-span">{'\\sum'}</span>
             </button>
-            <button onClick={() => setLatex(l => l + '\\infty')} title="Infinity">
+            <button onClick={() => insertSnippet('\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}')} title="Matrix">
+              <span className="latex-span">{'[M]'}</span>
+            </button>
+            <button onClick={() => insertSnippet('\\infty')} title="Infinity">
               <span className="latex-span">{'\\infty'}</span>
             </button>
           </div>
@@ -131,13 +175,13 @@ const App: React.FC = () => {
         </section>
 
         {/* Preview Side */}
-        <section className="preview-pane glass">
+        <section className="preview-pane glass" ref={previewRef}>
           <div className="pane-header">
             <div className="tab active">
               <Cpu size={14} /> Live Preview
             </div>
             <div className="preview-status">
-              <div className="status-dot"></div> Rendered
+              <div className="status-dot"></div> Live
             </div>
           </div>
           <div className="preview-content">
@@ -151,11 +195,11 @@ const App: React.FC = () => {
         <div className="footer-left">
           <span>Engine: KaTeX 0.16.28</span>
           <div className="divider"></div>
-          <span>Lines: {latex.split('\\n').length}</span>
+          <span>Lines: {latex.split('\n').length}</span>
         </div>
         <div className="footer-right">
           <a href="#" className="footer-link"><HelpCircle size={14} /> Documentation</a>
-          <a href="#" className="footer-link"><Github size={14} /> GitHub</a>
+          <a href="https://github.com/videctech/latexvidec" target="_blank" className="footer-link"><Github size={14} /> GitHub</a>
         </div>
       </footer>
     </motion.div>
@@ -167,14 +211,10 @@ const LatexRenderer: React.FC<{ content: string }> = ({ content }) => {
 
   useEffect(() => {
     if (containerRef.current) {
-      // Process the text to find math blocks
-      // For this demo, we'll use a simple regex approach to render both inline and display math
-      // Note: Real LaTeX engines are much more complex, but KaTeX is great for math.
-      // We will render the whole content as HTML and then find parts to render with KaTeX.
-
+      // 1. Convert structural LaTeX to HTML
       let html = content
         .replace(/\\section\{(.*?)\}/g, '<h1 class="latex-h1">$1</h1>')
-        .replace(/\\subsection\{(.*?)\}/g, '<h2 class="latex-h2">$2</h2>')
+        .replace(/\\subsection\{(.*?)\}/g, '<h2 class="latex-h2">$1</h2>')
         .replace(/\\textbf\{(.*?)\}/g, '<strong>$1</strong>')
         .replace(/\\textit\{(.*?)\}/g, '<em>$1</em>')
         .replace(/\\underline\{(.*?)\}/g, '<u>$1</u>')
@@ -185,23 +225,7 @@ const LatexRenderer: React.FC<{ content: string }> = ({ content }) => {
 
       containerRef.current.innerHTML = html;
 
-      // Render Display Math: \[ ... \] or $$ ... $$
-      const displayMathRegex = /\\\[([\s\S]*?)\\\]|\$\$([\s\S]*?)\$\$/g;
-      let displayMatch;
-      while ((displayMatch = displayMathRegex.exec(content)) !== null) {
-        const math = displayMatch[1] || displayMatch[2];
-        try {
-          katex.renderToString(math, { displayMode: true, throwOnError: false });
-        } catch (e) {
-          console.error(e);
-        }
-      }
-
-      // Inline Math: $ ... $ or \( ... \)
-      // This is harder to do with simple innerHTML replacement without breaking HTML tags.
-      // A better way is to use a library like `remark-math` or similar, 
-      // but I'll implement a custom "render-in-place" for the demo.
-
+      // 2. Render Math in Place
       renderMathInElement(containerRef.current);
     }
   }, [content]);
@@ -209,25 +233,31 @@ const LatexRenderer: React.FC<{ content: string }> = ({ content }) => {
   return <div ref={containerRef} className="latex-document" />;
 };
 
-// Helper to render math in an element using KaTeX auto-render logic (simplified)
 const renderMathInElement = (elem: HTMLElement) => {
-  // A simple implementation of auto-render
   const text = elem.innerHTML;
 
-  // Replace \[ ... \] with placeholders
+  // Replace \[ ... \] (Block Math)
   let newHtml = text.replace(/\\\[([\s\S]*?)\\\]/g, (_, math) => {
     try {
-      return `<div class="math-block">${katex.renderToString(math, { displayMode: true })}</div>`;
+      return `<div class="math-block">${katex.renderToString(math, { displayMode: true, throwOnError: false })}</div>`;
     } catch (e) {
       return `<span class="math-error">${math}</span>`;
     }
   });
 
-  // Replace \( ... \) or $ ... $ with placeholders
-  // Note: $...$ is tricky because of currency. We'll stick to \( ... \) for reliable demo.
+  // Replace $$ ... $$ (Alternative Block Math)
+  newHtml = newHtml.replace(/\$\$([\s\S]*?)\$\$/g, (_, math) => {
+    try {
+      return `<div class="math-block">${katex.renderToString(math, { displayMode: true, throwOnError: false })}</div>`;
+    } catch (e) {
+      return `<span class="math-error">${math}</span>`;
+    }
+  });
+
+  // Replace \( ... \) or $ ... $ (Inline Math)
   newHtml = newHtml.replace(/\\\(([\s\S]*?)\\\)/g, (_, math) => {
     try {
-      return `<span class="math-inline">${katex.renderToString(math, { displayMode: false })}</span>`;
+      return `<span class="math-inline">${katex.renderToString(math, { displayMode: false, throwOnError: false })}</span>`;
     } catch (e) {
       return `<span class="math-error">${math}</span>`;
     }
