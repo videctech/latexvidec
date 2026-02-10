@@ -1,26 +1,26 @@
 :root {
-  --bg-primary: #0a0a0c;
-  --bg-secondary: #141418;
-  --bg-tertiary: #1c1c21;
-  
-  --accent-primary: #8b5cf6;
-  --accent-secondary: #3b82f6;
-  --accent-gradient: linear-gradient(135deg, #8b5cf6, #3b82f6);
-  
-  --text-primary: #f8fafc;
+  --bg-primary: #050505;
+  --bg-secondary: #0f0f12;
+  --bg-tertiary: #16161a;
+
+  --accent-primary: #a855f7;
+  --accent-secondary: #6366f1;
+  --accent-gradient: linear-gradient(135deg, #a855f7, #6366f1);
+  --accent-glow: rgba(168, 85, 247, 0.4);
+
+  --text-primary: #ffffff;
   --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  
-  --border-color: rgba(255, 255, 255, 0.08);
-  --glass-bg: rgba(20, 20, 24, 0.7);
+  --text-muted: #475569;
+
+  --border-color: rgba(255, 255, 255, 0.06);
+  --glass-bg: rgba(15, 15, 18, 0.8);
   --glass-border: rgba(255, 255, 255, 0.1);
-  
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  
-  --font-main: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+  --shadow-premium: 0 20px 50px rgba(0, 0, 0, 0.5);
+
+  --font-main: 'Outfit', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-serif: 'Inter', serif;
 }
 
 * {
@@ -34,20 +34,17 @@ body {
   color: var(--text-primary);
   font-family: var(--font-main);
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
   height: 100vh;
-  width: 100vw;
 }
 
 #root {
   height: 100%;
-  width: 100%;
 }
 
+/* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -56,31 +53,38 @@ body {
 
 ::-webkit-scrollbar-thumb {
   background: var(--bg-tertiary);
-  border-radius: 4px;
+  border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
+  background: var(--accent-primary);
 }
 
-.glass {
+.glass-panel {
   background: var(--glass-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(20px);
   border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-premium);
 }
 
-.glow {
-  box-shadow: 0 0 20px rgba(139, 92, 246, 0.15);
+.animate-pulse-slow {
+  animation: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-button {
-  cursor: pointer;
-  border: none;
-  outline: none;
-  transition: all 0.2s ease;
+@keyframes pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.7;
+  }
 }
 
-button:active {
-  transform: scale(0.95);
+/* Selection */
+::selection {
+  background: var(--accent-primary);
+  color: white;
 }

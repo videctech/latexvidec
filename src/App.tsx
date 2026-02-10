@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   FileText,
   Download,
@@ -13,42 +13,69 @@ import {
   Minimize2,
   Github,
   CheckCircle2,
-  Loader2
+  Loader2,
+  Layout,
+  Code2,
+  Layers,
+  Sparkles
 } from 'lucide-react';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
+
+// Syntax Highlighting
+import Editor from 'react-simple-code-editor';
+import { highlight, languages } from 'prismjs';
+import 'prismjs/components/prism-latex';
+import 'prismjs/themes/prism-tomorrow.css';
+
 import './App.css';
 
-const DEFAULT_LATEX = `\\section{LuminaLaTeX Deep Dive}
+const TEMPLATES = {
+  basic: `\\section{Untitled Document}
+\\subsection{Introduction}
+Start typing your professional LaTeX content here.
 
-LuminaLaTeX is a high-performance, real-time LaTeX editor.
+\\[ E = mc^2 \\]`,
+  report: `\\section{Technical Report 2026}
+\\subsection{Abstract}
+This report outlines the breakthrough in real-time typesetting using the LuminaLaTeX engine.
 
-\\subsection{Equation of the Universe}
-The Schrodinger Equation describes how the quantum state of a physical system changes with time.
-\\[ i\\hbar\\frac{\\partial}{\\partial t}\\Psi(\\mathbf{r},t) = \\left[ -\\frac{\\hbar^2}{2m}\\nabla^2 + V(\\mathbf{r},t) \\right]\\Psi(\\mathbf{r},t) \\]
-
-\\subsection{Matrices}
-Complex data can be represented easily:
-\\[ A = \\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix} \\]
-
-\\subsection{Key Advancements}
+\\subsection{System Architecture}
 \\begin{itemize}
-  \\item \\textbf{Live PDF Export}: Export your rendered document instantly.
-  \\item \\textbf{KaTeX Engine}: Desktop-grade math performance.
-  \\item \\textbf{Smart Snippets}: One-tap symbol insertion.
+  \\item High-speed KaTeX parsing
+  \\item Virtual DOM Diffing
+  \\item Asynchronous PDF Generation
 \\end{itemize}
 
-\\textit{Happy typesetting!}
-`;
+\\[ \\nabla \\times \\mathbf{E} = -\\frac{\\partial \\mathbf{B}}{\\partial t} \\]`,
+  memo: `\\section{Internal Memorandum}
+\\textbf{To:} Scientific Community \\\\
+\\textbf{From:} Lumina Engineering \\\\
+\\textbf{Subject:} Professional LaTeX Standards
+
+\\subsection{Key Message}
+The standard for online LaTeX editing has been elevated. 
+
+\\textit{Signed, Engineering}`
+};
 
 const App: React.FC = () => {
-  const [latex, setLatex] = useState(DEFAULT_LATEX);
+  const [latex, setLatex] = useState(() => {
+    const saved = localStorage.getItem('lumina-latex-content');
+    return saved || TEMPLATES.basic;
+  });
+
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const previewRef = useRef<HTMLDivElement>(null);
+
+  // Persistence
+  useEffect(() => {
+    localStorage.setItem('lumina-latex-content', latex);
+  }, [latex]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(latex);
@@ -56,36 +83,24 @@ const App: React.FC = () => {
     setTimeout(() => setIsCopied(false), 2000);
   };
 
-  const handleClear = () => {
-    if (confirm('Are you sure you want to clear the editor?')) {
-      setLatex('');
-    }
-  };
-
   const handleExportPDF = async () => {
     if (!previewRef.current || isExporting) return;
-
     setIsExporting(true);
     try {
-      const element = previewRef.current.querySelector('.preview-content') as HTMLElement;
+      const element = previewRef.current.querySelector('.paper') as HTMLElement;
       const canvas = await html2canvas(element, {
         scale: 2,
         useCORS: true,
-        logging: false,
         backgroundColor: '#ffffff'
       });
-
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgProps = pdf.getImageProperties(imgData);
       const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save('lumina-document.pdf');
-    } catch (error) {
-      console.error('Export failed:', error);
-      alert('Failed to export PDF. Please try again.');
+      pdf.save('lumina-exports.pdf');
+    } catch (e) {
+      console.error(e);
     } finally {
       setIsExporting(false);
     }
@@ -101,105 +116,140 @@ const App: React.FC = () => {
       animate={{ opacity: 1 }}
       className={`app-container ${isFullscreen ? 'fullscreen' : ''}`}
     >
-      {/* Header */}
-      <header className="glass">
+      <header>
         <div className="logo">
-          <div className="logo-icon">
-            <Zap size={20} fill="var(--accent-primary)" stroke="var(--accent-primary)" />
-          </div>
+          <motion.div
+            whileHover={{ scale: 1.1, rotate: 5 }}
+            className="logo-icon"
+          >
+            <Zap size={24} fill="white" stroke="white" />
+          </motion.div>
           <h1>Lumina<span>LaTeX</span></h1>
         </div>
 
         <div className="header-actions">
           <button className="btn-secondary" onClick={handleCopy}>
-            {isCopied ? <><CheckCircle2 size={16} /> Copied</> : <><Copy size={16} /> Copy .tex</>}
+            {isCopied ? <CheckCircle2 size={16} /> : <Copy size={16} />}
+            <span>{isCopied ? 'Copied' : 'Copy Code'}</span>
           </button>
+
           <button className="btn-primary" onClick={handleExportPDF} disabled={isExporting}>
-            {isExporting ? <><Loader2 size={16} className="animate-spin" /> Working...</> : <><Download size={16} /> Export PDF</>}
+            {isExporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+            <span>Export PDF</span>
           </button>
+
           <div className="divider"></div>
+
           <button className="btn-icon" onClick={() => setIsFullscreen(!isFullscreen)}>
-            {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+            {isFullscreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
           </button>
+
           <button className="btn-icon">
-            <Settings size={18} />
+            <Settings size={20} />
           </button>
         </div>
       </header>
 
-      {/* Main Content */}
       <main>
-        {/* Sidebar/Snippets */}
-        <aside className="snippets-sidebar glass">
-          <div className="sidebar-title">Snippets</div>
-          <div className="snippet-group">
-            <button onClick={() => insertSnippet('\\frac{a}{b}')} title="Fraction">
-              <span className="latex-span">{'\\frac{a}{b}'}</span>
-            </button>
-            <button onClick={() => insertSnippet('\\sqrt{x}')} title="Square Root">
-              <span className="latex-span">{'\\sqrt{x}'}</span>
-            </button>
-            <button onClick={() => insertSnippet('\\int_{a}^{b}')} title="Integral">
-              <span className="latex-span">{'\\int'}</span>
-            </button>
-            <button onClick={() => insertSnippet('\\sum_{i=0}^{n}')} title="Sum">
-              <span className="latex-span">{'\\sum'}</span>
-            </button>
-            <button onClick={() => insertSnippet('\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}')} title="Matrix">
-              <span className="latex-span">{'[M]'}</span>
-            </button>
-            <button onClick={() => insertSnippet('\\infty')} title="Infinity">
-              <span className="latex-span">{'\\infty'}</span>
-            </button>
+        {/* Sidebar */}
+        <aside className="sidebar">
+          <div className="sidebar-section">
+            <div className="sidebar-label">Math Snippets</div>
+            <div className="sidebar-grid">
+              <button onClick={() => insertSnippet('\\frac{a}{b}')} title="Fraction">
+                <Layout size={18} />
+              </button>
+              <button onClick={() => insertSnippet('\\sqrt{x}')} title="Root">
+                <Sparkles size={18} />
+              </button>
+              <button onClick={() => insertSnippet('\\int_{a}^{b}')} title="Integral">
+                <Layers size={18} />
+              </button>
+              <button onClick={() => insertSnippet('\\sum')} title="Sum">
+                <Code2 size={18} />
+              </button>
+              <button onClick={() => insertSnippet('\\infty')} title="Infinity">
+                <Cpu size={18} />
+              </button>
+              <button onClick={() => setLatex('')} title="Clear">
+                <Trash2 size={18} />
+              </button>
+            </div>
+          </div>
+
+          <div className="sidebar-section">
+            <div className="sidebar-label">Templates</div>
+            <div className="template-list">
+              <button className="template-btn" onClick={() => setLatex(TEMPLATES.basic)}>
+                <FileText size={16} /> Basic Doc
+              </button>
+              <button className="template-btn" onClick={() => setLatex(TEMPLATES.report)}>
+                <FileText size={16} /> Technical Report
+              </button>
+              <button className="template-btn" onClick={() => setLatex(TEMPLATES.memo)}>
+                <FileText size={16} /> Scientific Memo
+              </button>
+            </div>
           </div>
         </aside>
 
-        {/* Editor Side */}
-        <section className="editor-pane">
+        {/* Editor Pane */}
+        <section className="pane">
           <div className="pane-header">
-            <div className="tab active">
-              <FileText size={14} /> main.tex
+            <div className="pane-title">
+              <Code2 size={16} className="text-secondary" />
+              Source Editor
             </div>
-            <button className="btn-icon-sm" onClick={handleClear} title="Clear Editor">
-              <Trash2 size={14} />
-            </button>
+            <div className="preview-status">
+              <div className="status-dot"></div>
+              <span>Auto-saving</span>
+            </div>
           </div>
-          <div className="editor-content">
-            <textarea
+          <div className="editor-wrapper">
+            <Editor
               value={latex}
-              onChange={(e) => setLatex(e.target.value)}
-              placeholder="Enter LaTeX here..."
-              spellCheck={false}
+              onValueChange={setLatex}
+              highlight={code => highlight(code, languages.latex, 'latex')}
+              padding={20}
+              style={{
+                fontFamily: '"JetBrains Mono", monospace',
+                fontSize: 16,
+                minHeight: '100%',
+                color: '#e2e8f0'
+              }}
             />
           </div>
         </section>
 
-        {/* Preview Side */}
-        <section className="preview-pane glass" ref={previewRef}>
+        {/* Preview Pane */}
+        <section className="pane preview-pane" ref={previewRef}>
           <div className="pane-header">
-            <div className="tab active">
-              <Cpu size={14} /> Live Preview
+            <div className="pane-title">
+              <FileText size={16} className="text-secondary" />
+              Document Preview
             </div>
             <div className="preview-status">
-              <div className="status-dot"></div> Live
+              <span style={{ color: 'var(--text-muted)' }}>A4 Standard</span>
             </div>
           </div>
-          <div className="preview-content">
-            <LatexRenderer content={latex} />
+          <div className="preview-container">
+            <div className="paper">
+              <LatexRenderer content={latex} />
+            </div>
           </div>
         </section>
       </main>
 
-      {/* Footer */}
-      <footer className="glass">
+      <footer>
         <div className="footer-left">
-          <span>Engine: KaTeX 0.16.28</span>
+          <span>Standardized: ISO/IEC 15444</span>
           <div className="divider"></div>
-          <span>Lines: {latex.split('\n').length}</span>
+          <span>Symbols: {latex.length}</span>
         </div>
         <div className="footer-right">
-          <a href="#" className="footer-link"><HelpCircle size={14} /> Documentation</a>
-          <a href="https://github.com/videctech/latexvidec" target="_blank" className="footer-link"><Github size={14} /> GitHub</a>
+          <a href="https://github.com/videctech/latexvidec" target="_blank" className="footer-link">
+            <Github size={14} /> Open Source
+          </a>
         </div>
       </footer>
     </motion.div>
@@ -207,25 +257,22 @@ const App: React.FC = () => {
 };
 
 const LatexRenderer: React.FC<{ content: string }> = ({ content }) => {
-  const containerRef = React.useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (containerRef.current) {
-      // 1. Convert structural LaTeX to HTML
       let html = content
         .replace(/\\section\{(.*?)\}/g, '<h1 class="latex-h1">$1</h1>')
         .replace(/\\subsection\{(.*?)\}/g, '<h2 class="latex-h2">$1</h2>')
         .replace(/\\textbf\{(.*?)\}/g, '<strong>$1</strong>')
         .replace(/\\textit\{(.*?)\}/g, '<em>$1</em>')
         .replace(/\\underline\{(.*?)\}/g, '<u>$1</u>')
-        .replace(/\\begin\{itemize\}/g, '<ul class="latex-ul">')
+        .replace(/\\begin\{itemize\}/g, '<ul class="latex-ul" style="margin-left: 20px; margin-bottom: 20px;">')
         .replace(/\\end\{itemize\}/g, '</ul>')
-        .replace(/\\item (.*?)/g, '<li>$1</li>')
+        .replace(/\\item (.*?)/g, '<li style="margin-bottom: 8px;">$1</li>')
         .replace(/\n\n/g, '<br/><br/>');
 
       containerRef.current.innerHTML = html;
-
-      // 2. Render Math in Place
       renderMathInElement(containerRef.current);
     }
   }, [content]);
@@ -240,26 +287,26 @@ const renderMathInElement = (elem: HTMLElement) => {
   let newHtml = text.replace(/\\\[([\s\S]*?)\\\]/g, (_, math) => {
     try {
       return `<div class="math-block">${katex.renderToString(math, { displayMode: true, throwOnError: false })}</div>`;
-    } catch (e) {
-      return `<span class="math-error">${math}</span>`;
+    } catch {
+      return `<span style="color: red">${math}</span>`;
     }
   });
 
-  // Replace $$ ... $$ (Alternative Block Math)
-  newHtml = newHtml.replace(/\$\$([\s\S]*?)\$\$/g, (_, math) => {
-    try {
-      return `<div class="math-block">${katex.renderToString(math, { displayMode: true, throwOnError: false })}</div>`;
-    } catch (e) {
-      return `<span class="math-error">${math}</span>`;
-    }
-  });
-
-  // Replace \( ... \) or $ ... $ (Inline Math)
+  // Inline Math \( ... \) or $ ... $
   newHtml = newHtml.replace(/\\\(([\s\S]*?)\\\)/g, (_, math) => {
     try {
       return `<span class="math-inline">${katex.renderToString(math, { displayMode: false, throwOnError: false })}</span>`;
-    } catch (e) {
-      return `<span class="math-error">${math}</span>`;
+    } catch {
+      return `<span style="color: red">${math}</span>`;
+    }
+  });
+
+  // Basic Matrix/Environment support
+  newHtml = newHtml.replace(/\\begin\{pmatrix\}([\s\S]*?)\\end\{pmatrix\}/g, (_, math) => {
+    try {
+      return katex.renderToString(`\\begin{pmatrix}${math}\\end{pmatrix}`, { displayMode: true, throwOnError: false });
+    } catch {
+      return math;
     }
   });
 
