@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   FileText,
@@ -17,7 +17,17 @@ import {
   Layout,
   Code2,
   Layers,
-  Sparkles
+  Sparkles,
+  Files,
+  Search,
+  MessageSquare,
+  Moon,
+  Sun,
+  Book,
+  Sigma,
+  Plus,
+  ArrowRight,
+  Info
 } from 'lucide-react';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
@@ -61,24 +71,57 @@ The standard for online LaTeX editing has been elevated.
 \\textit{Signed, Engineering}`
 };
 
+const SYMBOLS = {
+  Greek: ['\\alpha', '\\beta', '\\gamma', '\\delta', '\\epsilon', '\\theta', '\\lambda', '\\pi', '\\sigma', '\\phi', '\\omega', '\\Omega'],
+  Operators: ['\\sum', '\\int', '\\prod', '\\sqrt{x}', '\\frac{a}{b}', '\\lim_{x\\to\\infty}'],
+  Relations: ['\\le', '\\ge', '\\in', '\\notin', '\\subset', '\\approx', '\\neq', '\\equiv'],
+  Arrows: ['\\to', '\\Rightarrow', '\\leftrightarrow', '\\uparrow', '\\downarrow']
+};
+
+interface File {
+  name: string;
+  content: string;
+  type: 'tex' | 'bib';
+}
+
 const App: React.FC = () => {
-  const [latex, setLatex] = useState(() => {
-    const saved = localStorage.getItem('lumina-latex-content');
-    return saved || TEMPLATES.basic;
+  const [files, setFiles] = useState<File[]>(() => {
+    const saved = localStorage.getItem('lumina-files');
+    if (saved) return JSON.parse(saved);
+    return [
+      { name: 'main.tex', content: TEMPLATES.report, type: 'tex' },
+      { name: 'references.bib', content: '@article{lumina2026,\n  author = {Lumina Tech},\n  title = {The Future of LaTeX},\n  year = {2026}\n}', type: 'bib' }
+    ];
   });
 
+  const [activeFileIndex, setActiveFileIndex] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const [activeTab, setActiveTab] = useState<'editor' | 'preview'>('editor');
+  const [logs, setLogs] = useState<string[]>(['Lumina Engine Initialized...', 'System Ready.']);
+  const [sidebarTab, setSidebarTab] = useState<'files' | 'toolbox'>('files');
+
   const previewRef = useRef<HTMLDivElement>(null);
 
   // Persistence
   useEffect(() => {
-    localStorage.setItem('lumina-latex-content', latex);
-  }, [latex]);
+    localStorage.setItem('lumina-files', JSON.stringify(files));
+  }, [files]);
+
+  const updateActiveContent = (newContent: string) => {
+    const updatedFiles = [...files];
+    updatedFiles[activeFileIndex].content = newContent;
+    setFiles(updatedFiles);
+
+    if (Math.random() > 0.95) {
+      setLogs(prev => [...prev.slice(-10), `Re-rendered at ${new Date().toLocaleTimeString()}`]);
+    }
+  };
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(latex);
+    navigator.clipboard.writeText(files[activeFileIndex].content);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
   };
@@ -86,6 +129,7 @@ const App: React.FC = () => {
   const handleExportPDF = async () => {
     if (!previewRef.current || isExporting) return;
     setIsExporting(true);
+    setLogs(prev => [...prev, 'Starting PDF generation...']);
     try {
       const element = previewRef.current.querySelector('.paper') as HTMLElement;
       const canvas = await html2canvas(element, {
@@ -98,158 +142,223 @@ const App: React.FC = () => {
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save('lumina-exports.pdf');
+      pdf.save(`${files[activeFileIndex].name}.pdf`);
+      setLogs(prev => [...prev, 'PDF Export Successful.']);
     } catch (e) {
       console.error(e);
+      setLogs(prev => [...prev, 'PDF Export Failed: Internal Error']);
     } finally {
       setIsExporting(false);
     }
   };
 
   const insertSnippet = (snippet: string) => {
-    setLatex(prev => prev + snippet);
+    updateActiveContent(files[activeFileIndex].content + snippet);
+  };
+
+  const addFile = () => {
+    const name = prompt('File name:');
+    if (name) {
+      setFiles([...files, { name, content: '', type: name.endsWith('.bib') ? 'bib' : 'tex' }]);
+    }
+  };
+
+  const deleteFile = (index: number) => {
+    if (files.length === 1) return;
+    if (confirm(`Delete ${files[index].name}?`)) {
+      const newFiles = files.filter((_, i) => i !== index);
+      setFiles(newFiles);
+      setActiveFileIndex(0);
+    }
   };
 
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className={`app-container ${isFullscreen ? 'fullscreen' : ''}`}
+      className={`app-container ${isFullscreen ? 'fullscreen' : ''} theme-${theme}`}
     >
-      <header>
+      <header className="glass">
         <div className="logo">
-          <motion.div
-            whileHover={{ scale: 1.1, rotate: 5 }}
-            className="logo-icon"
-          >
+          <div className="logo-icon">
             <Zap size={24} fill="white" stroke="white" />
-          </motion.div>
-          <h1>Lumina<span>LaTeX</span></h1>
+          </div>
+          <div className="logo-text">
+            <h1>Lumina<span>LaTeX</span></h1>
+            <span className="version">Pro v2.0</span>
+          </div>
         </div>
 
         <div className="header-actions">
+          <div className="file-tabs">
+            {files.map((file, i) => (
+              <button
+                key={file.name}
+                className={`file-tab ${activeFileIndex === i ? 'active' : ''}`}
+                onClick={() => setActiveFileIndex(i)}
+              >
+                {file.type === 'tex' ? <FileText size={12} /> : <Book size={12} />}
+                {file.name}
+              </button>
+            ))}
+            <button className="add-file-btn" onClick={addFile}><Plus size={14} /></button>
+          </div>
+
+          <div className="divider"></div>
+
           <button className="btn-secondary" onClick={handleCopy}>
             {isCopied ? <CheckCircle2 size={16} /> : <Copy size={16} />}
-            <span>{isCopied ? 'Copied' : 'Copy Code'}</span>
+            <span>{isCopied ? 'Copied' : 'Copy'}</span>
           </button>
 
           <button className="btn-primary" onClick={handleExportPDF} disabled={isExporting}>
             {isExporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-            <span>Export PDF</span>
+            <span>PDF</span>
           </button>
 
           <div className="divider"></div>
 
-          <button className="btn-icon" onClick={() => setIsFullscreen(!isFullscreen)}>
-            {isFullscreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
+          <button className="btn-icon" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+            {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
           </button>
 
-          <button className="btn-icon">
-            <Settings size={20} />
+          <button className="btn-icon" onClick={() => setIsFullscreen(!isFullscreen)}>
+            {isFullscreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
           </button>
         </div>
       </header>
 
       <main>
+        {/* Left Vertical Nav */}
+        <nav className="vertical-nav">
+          <button className={sidebarTab === 'files' ? 'active' : ''} onClick={() => setSidebarTab('files')}>
+            <Files size={20} />
+          </button>
+          <button className={sidebarTab === 'toolbox' ? 'active' : ''} onClick={() => setSidebarTab('toolbox')}>
+            <Sigma size={20} />
+          </button>
+          <div className="spacer"></div>
+          <button><Settings size={20} /></button>
+          <button><HelpCircle size={20} /></button>
+        </nav>
+
         {/* Sidebar */}
         <aside className="sidebar">
-          <div className="sidebar-section">
-            <div className="sidebar-label">Math Snippets</div>
-            <div className="sidebar-grid">
-              <button onClick={() => insertSnippet('\\frac{a}{b}')} title="Fraction">
-                <Layout size={18} />
-              </button>
-              <button onClick={() => insertSnippet('\\sqrt{x}')} title="Root">
-                <Sparkles size={18} />
-              </button>
-              <button onClick={() => insertSnippet('\\int_{a}^{b}')} title="Integral">
-                <Layers size={18} />
-              </button>
-              <button onClick={() => insertSnippet('\\sum')} title="Sum">
-                <Code2 size={18} />
-              </button>
-              <button onClick={() => insertSnippet('\\infty')} title="Infinity">
-                <Cpu size={18} />
-              </button>
-              <button onClick={() => setLatex('')} title="Clear">
-                <Trash2 size={18} />
-              </button>
-            </div>
-          </div>
+          {sidebarTab === 'files' ? (
+            <div className="sidebar-section">
+              <div className="sidebar-label">Project Files</div>
+              <div className="file-list">
+                {files.map((file, i) => (
+                  <div key={file.name} className={`file-item ${activeFileIndex === i ? 'active' : ''}`}>
+                    <div className="file-info" onClick={() => setActiveFileIndex(i)}>
+                      {file.type === 'tex' ? <FileText size={14} /> : <Book size={14} />}
+                      <span>{file.name}</span>
+                    </div>
+                    <button className="delete-file" onClick={() => deleteFile(i)}><Trash2 size={12} /></button>
+                  </div>
+                ))}
+              </div>
 
-          <div className="sidebar-section">
-            <div className="sidebar-label">Templates</div>
-            <div className="template-list">
-              <button className="template-btn" onClick={() => setLatex(TEMPLATES.basic)}>
-                <FileText size={16} /> Basic Doc
-              </button>
-              <button className="template-btn" onClick={() => setLatex(TEMPLATES.report)}>
-                <FileText size={16} /> Technical Report
-              </button>
-              <button className="template-btn" onClick={() => setLatex(TEMPLATES.memo)}>
-                <FileText size={16} /> Scientific Memo
-              </button>
+              <div className="sidebar-label" style={{ marginTop: '20px' }}>Templates</div>
+              <div className="template-list">
+                <button className="template-btn" onClick={() => updateActiveContent(TEMPLATES.basic)}><Layout size={14} /> Basic</button>
+                <button className="template-btn" onClick={() => updateActiveContent(TEMPLATES.report)}><Layers size={14} /> Report</button>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="sidebar-section">
+              <div className="sidebar-label">Toolbox</div>
+              {Object.entries(SYMBOLS).map(([category, items]) => (
+                <div key={category} className="symbol-category">
+                  <div className="category-name">{category}</div>
+                  <div className="symbol-grid">
+                    {items.map(s => (
+                      <button key={s} onClick={() => insertSnippet(s)} title={s}>
+                        {s.startsWith('\\') ? (
+                          <span dangerouslySetInnerHTML={{ __html: katex.renderToString(s, { throwOnError: false }) }} />
+                        ) : s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </aside>
 
-        {/* Editor Pane */}
-        <section className="pane">
-          <div className="pane-header">
-            <div className="pane-title">
-              <Code2 size={16} className="text-secondary" />
-              Source Editor
+        {/* Editor & Preview Panes */}
+        <div className="split-view">
+          <section className="pane">
+            <div className="pane-header">
+              <div className="pane-title"><Code2 size={16} /> Source Editor</div>
+              <div className="pane-meta">
+                <span>{files[activeFileIndex].content.length} characters</span>
+              </div>
             </div>
-            <div className="preview-status">
-              <div className="status-dot"></div>
-              <span>Auto-saving</span>
+            <div className="editor-wrapper">
+              <Editor
+                value={files[activeFileIndex].content}
+                onValueChange={updateActiveContent}
+                highlight={code => highlight(code, languages.latex, 'latex')}
+                padding={25}
+                style={{
+                  fontFamily: '"JetBrains Mono", monospace',
+                  fontSize: 15,
+                  minHeight: '100%',
+                  color: 'inherit'
+                }}
+              />
             </div>
-          </div>
-          <div className="editor-wrapper">
-            <Editor
-              value={latex}
-              onValueChange={setLatex}
-              highlight={code => highlight(code, languages.latex, 'latex')}
-              padding={20}
-              style={{
-                fontFamily: '"JetBrains Mono", monospace',
-                fontSize: 16,
-                minHeight: '100%',
-                color: '#e2e8f0'
-              }}
-            />
-          </div>
-        </section>
+          </section>
 
-        {/* Preview Pane */}
-        <section className="pane preview-pane" ref={previewRef}>
-          <div className="pane-header">
-            <div className="pane-title">
-              <FileText size={16} className="text-secondary" />
-              Document Preview
+          <section className="pane preview-pane" ref={previewRef}>
+            <div className="pane-header">
+              <div className="pane-title"><Files size={16} /> Document View</div>
+              <div className="pane-controls">
+                <span>Zoom: 100%</span>
+              </div>
             </div>
-            <div className="preview-status">
-              <span style={{ color: 'var(--text-muted)' }}>A4 Standard</span>
+            <div className="preview-container">
+              <div className="paper">
+                <LatexRenderer content={files[activeFileIndex].content} />
+                {files.find(f => f.type === 'bib') && files[activeFileIndex].type === 'tex' && (
+                  <div className="bib-section">
+                    <h2 className="latex-h2">References</h2>
+                    <div className="references">
+                      {files.find(f => f.type === 'bib')?.content.split('\n').filter(l => l.includes('title')).map(ref => (
+                        <div key={ref} className="ref-item">• {ref.replace(/.*title = \{(.*)\},/, '$1')}</div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-          <div className="preview-container">
-            <div className="paper">
-              <LatexRenderer content={latex} />
-            </div>
-          </div>
-        </section>
+          </section>
+        </div>
       </main>
 
-      <footer>
-        <div className="footer-left">
-          <span>Standardized: ISO/IEC 15444</span>
-          <div className="divider"></div>
-          <span>Symbols: {latex.length}</span>
+      {/* Logs Panel */}
+      <footer className="advanced-footer">
+        <div className="log-panel">
+          <div className="log-header">
+            <Info size={12} /> Console Logs
+          </div>
+          <div className="log-entries">
+            {logs.map((log, i) => <div key={i} className="log-entry">{'>'} {log}</div>)}
+          </div>
         </div>
-        <div className="footer-right">
-          <a href="https://github.com/videctech/latexvidec" target="_blank" className="footer-link">
-            <Github size={14} /> Open Source
-          </a>
+        <div className="footer-bar">
+          <div className="f-left">
+            <CheckCircle2 size={12} color="#22c55e" />
+            <span>Project Valid</span>
+            <span className="divider"></span>
+            <span>UTF-8</span>
+          </div>
+          <div className="f-right">
+            <span>KaTeX Engine: Enabled</span>
+            <span className="divider"></span>
+            <span>{files[activeFileIndex].name}</span>
+          </div>
         </div>
       </footer>
     </motion.div>
@@ -267,9 +376,9 @@ const LatexRenderer: React.FC<{ content: string }> = ({ content }) => {
         .replace(/\\textbf\{(.*?)\}/g, '<strong>$1</strong>')
         .replace(/\\textit\{(.*?)\}/g, '<em>$1</em>')
         .replace(/\\underline\{(.*?)\}/g, '<u>$1</u>')
-        .replace(/\\begin\{itemize\}/g, '<ul class="latex-ul" style="margin-left: 20px; margin-bottom: 20px;">')
+        .replace(/\\begin\{itemize\}/g, '<ul class="latex-ul">')
         .replace(/\\end\{itemize\}/g, '</ul>')
-        .replace(/\\item (.*?)/g, '<li style="margin-bottom: 8px;">$1</li>')
+        .replace(/\\item (.*?)/g, '<li>$1</li>')
         .replace(/\n\n/g, '<br/><br/>');
 
       containerRef.current.innerHTML = html;
@@ -283,31 +392,28 @@ const LatexRenderer: React.FC<{ content: string }> = ({ content }) => {
 const renderMathInElement = (elem: HTMLElement) => {
   const text = elem.innerHTML;
 
-  // Replace \[ ... \] (Block Math)
   let newHtml = text.replace(/\\\[([\s\S]*?)\\\]/g, (_, math) => {
     try {
       return `<div class="math-block">${katex.renderToString(math, { displayMode: true, throwOnError: false })}</div>`;
-    } catch {
-      return `<span style="color: red">${math}</span>`;
-    }
+    } catch { return `<span style="color: red">${math}</span>`; }
   });
 
-  // Inline Math \( ... \) or $ ... $
+  newHtml = newHtml.replace(/\$\$([\s\S]*?)\$\$/g, (_, math) => {
+    try {
+      return `<div class="math-block">${katex.renderToString(math, { displayMode: true, throwOnError: false })}</div>`;
+    } catch { return math; }
+  });
+
   newHtml = newHtml.replace(/\\\(([\s\S]*?)\\\)/g, (_, math) => {
     try {
       return `<span class="math-inline">${katex.renderToString(math, { displayMode: false, throwOnError: false })}</span>`;
-    } catch {
-      return `<span style="color: red">${math}</span>`;
-    }
+    } catch { return math; }
   });
 
-  // Basic Matrix/Environment support
-  newHtml = newHtml.replace(/\\begin\{pmatrix\}([\s\S]*?)\\end\{pmatrix\}/g, (_, math) => {
+  newHtml = newHtml.replace(/\$([\s\S]*?)\$/g, (_, math) => {
     try {
-      return katex.renderToString(`\\begin{pmatrix}${math}\\end{pmatrix}`, { displayMode: true, throwOnError: false });
-    } catch {
-      return math;
-    }
+      return `<span class="math-inline">${katex.renderToString(math, { displayMode: false, throwOnError: false })}</span>`;
+    } catch { return math; }
   });
 
   elem.innerHTML = newHtml;
