@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect, useRef } from 'react';
+import { motion } from 'framer-motion';
 import {
   FileText,
   Download,
@@ -7,28 +7,23 @@ import {
   Trash2,
   Settings,
   HelpCircle,
-  Cpu,
   Zap,
   Maximize2,
   Minimize2,
-  Github,
   CheckCircle2,
   Loader2,
   Layout,
   Code2,
   Layers,
-  Sparkles,
   Files,
-  Search,
-  MessageSquare,
   Moon,
   Sun,
   Book,
   Sigma,
   Plus,
-  ArrowRight,
   Info
 } from 'lucide-react';
+
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import html2canvas from 'html2canvas';
@@ -99,7 +94,7 @@ const App: React.FC = () => {
   const [isCopied, setIsCopied] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
-  const [activeTab, setActiveTab] = useState<'editor' | 'preview'>('editor');
+
   const [logs, setLogs] = useState<string[]>(['Lumina Engine Initialized...', 'System Ready.']);
   const [sidebarTab, setSidebarTab] = useState<'files' | 'toolbox'>('files');
 
